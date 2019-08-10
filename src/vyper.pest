@@ -1,13 +1,19 @@
-module = { SOI ~ module_stmt* ~ EOI }
+module = _{ SOI ~ module_stmt* ~ EOI }
 
-module_stmt = { import }
+module_stmt = _{ import ~ NEWLINE+ }
 
 // Imports
-import = { norm_import | from_import }
+import = _{ simp_import | from_import }
 
-norm_import = { "import" ~ module_path ~ as_alias? }
+simp_import = { "import" ~ module_path ~ as_alias? }
 from_import = { "from" ~ module_path ~ "import" ~ (symbol_as_alias | import_list) }
-import_list = { "(" ~ symbol_as_alias ~ ("," ~ symbol_as_alias)* ~ ")" }
+import_list = {
+    "(" ~ NEWLINE*
+    ~ symbol_as_alias
+    ~ ("," ~ NEWLINE* ~ symbol_as_alias)*
+    ~ ","? ~ NEWLINE*
+    ~ ")"
+}
 
 module_path = { (".." | ".")? ~ symbol ~ ("." ~ symbol)* }
 
@@ -21,4 +27,4 @@ symbol = @{ sym_non_numeric ~ sym_numeric* }
 sym_non_numeric = @{ "_" | 'a'..'z' | 'A'..'Z' }
 sym_numeric = @{ "_" | 'a'..'z' | 'A'..'Z' | '0'..'9' }
 
-WHITESPACE = _{ " " | "\n" | "\r" | "\t" }
+WHITESPACE = _{ " " | "\t" }

@@ -9,6 +9,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_multiple_imports() {
+        parses_to! {
+            parser: VyperParser,
+            input: &r###"
+import foo
+import bar
+"###[1..],
+            rule: Rule::module,
+            tokens: [
+                simp_import(0, 10, [module_path(7, 10, [symbol(7, 10)])]),
+                simp_import(11, 21, [module_path(18, 21, [symbol(18, 21)])]),
+            ]
+        }
+
+        parses_to! {
+            parser: VyperParser,
+            input: &r###"
+from foo import (
+    bar as b,
+    baz as z,
+)
+"###[1..],
+            rule: Rule::module,
+            tokens: [
+                from_import(0, 47, [
+                    module_path(5, 9, [symbol(5, 8)]),
+                    import_list(16, 47, [
+                        symbol_as_alias(22, 30, [symbol(22, 25), as_alias(26, 30, [symbol(29, 30)])]),
+                        symbol_as_alias(36, 44, [symbol(36, 39), as_alias(40, 44, [symbol(43, 44)])]),
+                    ])
+                ]),
+            ]
+        }
+    }
+
+    #[test]
     fn parse_good_imports() {
         let examples = vec![
             "import foo",
