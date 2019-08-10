@@ -1,0 +1,22 @@
+module = { SOI ~ module_stmt* ~ EOI }
+
+module_stmt = { import }
+
+// Imports
+import = { norm_import | from_import }
+
+norm_import = { "import" ~ module_path ~ as_alias? }
+from_import = { "from" ~ module_path ~ "import" ~ (symbol_as_alias | import_list) }
+import_list = { "(" ~ symbol_as_alias ~ ("," ~ symbol_as_alias)* ~ ")" }
+
+module_path = { ("." | "..")? ~ symbol ~ ("." ~ symbol)* }
+
+// Generic
+symbol_as_alias = { symbol ~ as_alias? }
+as_alias = { "as" ~ symbol }
+
+// Symbols
+symbol = @{ sym_non_numeric ~ sym_numeric* }
+
+sym_non_numeric = @{ "_" | 'a'..'z' | 'A'..'Z' }
+sym_numeric = @{ "_" | 'a'..'z' | 'A'..'Z' | '0'..'9' }
