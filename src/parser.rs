@@ -9,6 +9,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_multiple_statements() {
+        parses_to! {
+            parser: VyperParser,
+            input: &r###"
+event Greet:#test
+    name: bytes32
+    foo: bytes32
+    bar: bytes32
+"###[1..],
+            rule: Rule::event_decl,
+            tokens: [
+                event_decl(0, 64, [
+                    symbol(6, 11),
+                    event_prop(17, 30, [symbol(17, 21), symbol(23, 30)]),
+                    event_prop(35, 47, [symbol(35, 38), symbol(40, 47)]),
+                    event_prop(52, 64, [symbol(52, 55), symbol(57, 64)]),
+                ]),
+            ]
+        }
+    }
+
+    #[test]
     fn parse_multiple_imports() {
         parses_to! {
             parser: VyperParser,
