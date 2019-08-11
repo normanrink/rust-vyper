@@ -10,8 +10,10 @@ keywords = ["ethereum", "vyper", "yul", "smart", "contract"]
 categories = ["cryptography::cryptocurrencies", "command-line-utilities", "development-tools"]
 readme = "README.md"
 
+[workspace]
+members = [".", "parser"]
+
 [dependencies]
+rust-vyper-parser = {path = "parser", version = "0.1.0"}
 num-bigint = "0.2"
 num-traits = "0.2"
-pest = "2.1"
-pest_derive = "2.1"
