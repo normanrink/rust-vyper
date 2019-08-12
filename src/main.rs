@@ -1,3 +1,4 @@
 fn main() {
-    println!("Hello, world!");
+    let s = "asdf";
+    println!("{}", s.chars().next().unwrap());
 }
