@@ -138,14 +138,18 @@ mod tests {
         );
         assert_eq!(
             do_parse(take_while_alphabetic, "1234"),
-            Ok((State::from_str("1234"), ""))
+            ParseError::make_return(State::from_str("1234"), "expected alphabetic chars".to_string()),
         );
 
         // EOF
-        //assert_eq!(
-        //    do_parse(take(4), ""),
-        //    ParseError::make_eof(State::from_str("")),
-        //);
+        let take_while_alphabetic = take_while(
+            |c| c.is_ascii_alphabetic(),
+            "expected alphabetic chars",
+        );
+        assert_eq!(
+            do_parse(take_while_alphabetic, ""),
+            ParseError::make_eof(State::from_str("")),
+        );
     }
 
     #[test]
