@@ -1,3 +1,7 @@
+use crate::utils::{
+    char_offset,
+};
+
 pub type IResult<I, O> = Result<(I, O), ParseError<I>>;
 
 #[derive(Debug, PartialEq)]
@@ -32,7 +36,7 @@ pub enum Reason {
     Exit(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct State<'a> {
     pub source: &'a str,
     pub input: &'a str,
@@ -53,31 +57,34 @@ impl<'a> State<'a> {
     }
 
     pub fn from_str_n(source: &'a str, n: usize) -> Self {
-        let s = Self::from_str(source);
-        s.advance(n)
+        let state = Self::from_str(source);
+        state.advance(n)
     }
 
+    /// Advance the parsing cursor by `n` chars.
     pub fn advance(&self, n: usize) -> Self {
         let mut line = self.line;
         let mut column = self.column;
 
         // Modify line and column number appropriately
-        for c in self.source.chars().take(n) {
-            if c == '\n' {
+        let mut local_position = 0;
+        for chr in self.source.chars().take(n) {
+            if chr == '\n' {
                 line += 1;
                 column = 1;
-            } else if c == '\r' {
-                // Do nothing
+            } else if chr == '\r' {
+                // Don't modify line or column for carriage return
             } else {
                 column += 1;
             }
+            local_position += 1;
         }
 
-        let p = self.position + n;
+        let off = char_offset(self.input, local_position).unwrap();
 
         Self {
-            input: &self.input[p..],
-            position: p,
+            input: &self.input[off..],
+            position: self.position + local_position,
             line,
             column,
             ..*self
