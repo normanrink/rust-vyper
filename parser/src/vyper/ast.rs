@@ -10,14 +10,14 @@ pub enum ModuleStmt {
         name: Name,
         fields: Vec<EventField>,
     },
-    InterfaceDef {
-        name: Name,
-        fields: Vec<InterfaceField>,
-        methods: Vec<InterfaceMethodDef>,
-    },
+    //InterfaceDef {
+    //    name: Name,
+    //    fields: Vec<InterfaceField>,
+    //    methods: Vec<InterfaceMethodDef>,
+    //},
     ContractDef {
         name: Name,
-        fields: Vec<ContractField>,
+        //fields: Vec<ContractField>,
         methods: Vec<ContractMethodDef>,
     },
 }
@@ -25,52 +25,83 @@ pub enum ModuleStmt {
 pub struct EventField {
     pub name: Name,
     pub typ: Type,
-    pub indexed: bool,
+    //pub indexed: bool,
 }
 
-pub struct InterfaceField {
-    pub name: Name,
-    pub typ: Type,
-}
+//pub struct InterfaceField {
+//    pub name: Name,
+//    pub typ: Type,
+//}
 
-pub struct ContractField {
-    pub name: Name,
-    pub typ: Type,
-    pub public: bool,
-}
+//pub struct ContractField {
+//    pub name: Name,
+//    pub typ: Type,
+//    pub public: bool,
+//}
 
-pub struct InterfaceMethodDef {
-    pub name: Name,
-    pub args: Vec<Arg>,
-    pub returns: Option<Type>,
-}
+//pub struct InterfaceMethodDef {
+//    pub name: Name,
+//    pub props: Vec<MethodProps>,
+//    pub args: Vec<Arg>,
+//    pub return_type: Option<Type>,
+//}
 
 pub struct ContractMethodDef {
     pub name: Name,
+    //pub props: Vec<MethodProps>,
     pub args: Vec<Arg>,
-    pub return_type: Option<Type>,
+    //pub return_type: Option<Type>,
     pub body: Option<Stmt>,
 }
 
 pub struct Arg {
     pub name: Name,
     pub typ: Type,
+    //pub default: Option<Expr>,
 }
 
-pub enum MethodProps {
-    Constant,
-    Modifying,
-    Public,
-    Private,
-}
+//pub enum MethodProps {
+//    Constant,
+//    Modifying,
+//    Public,
+//    Private,
+//}
 
 pub enum Stmt {
+    //Return {
+    //    value: Option<Expr>,
+    //}
+    //Assign {
+    //    target: Vec<Expr>,
+    //    typ: Type,
+    //    value: Expr,
+    //},
+    //AugAssign {
+    //    target: Expr,
+    //    op: Operator,
+    //},
     EmitEvent {
         event_name: Name,
         args: Vec<Expr>,
     },
 }
 
-pub enum Expr {
+pub enum Operator {
+    Add,
+    Sub,
+    Mult,
+    Div,
+    Mod,
+    Pow,
+    LShift,
+    RShift,
+    BitOr,
+    BitXor,
+    BitAnd,
+}
 
+pub enum Expr {
+    Name {
+        id: Name,
+    },
 }
