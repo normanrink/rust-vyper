@@ -4,6 +4,7 @@ use crate::internals::{
     ParseError,
 };
 use crate::utils::{
+    char_offset,
     len_chars,
 };
 
@@ -24,14 +25,13 @@ pub fn char<'a>(expected: char) -> impl Fn(State<'a>) -> IResult<State<'a>, char
 /// Parse `n` characters.  Exit for EOF.  Return for too few chars.
 pub fn take<'a>(n: usize) -> impl Fn(State<'a>) -> IResult<State<'a>, &'a str> {
     move |state: State| {
-        let len = len_chars(state.input);
-
-        if len == 0 {
-            ParseError::make_eof(state)
-        } else if len < n {
-            ParseError::make_return(state, format!("expected at least {} chars", n))
-        } else {
-            Ok((state.advance(n), &state.input[..n]))
+        match char_offset(state.input, n) {
+            None => if state.input.len() == 0 {
+                ParseError::make_eof(state)
+            } else {
+                ParseError::make_return(state, format!("expected at least {} chars", n))
+            },
+            Some(off) => Ok((state.advance(n), &state.input[..off])),
         }
     }
 }
@@ -42,17 +42,13 @@ where P: Fn(char) -> bool
 {
     move |state: State| {
         match state.input.find(|c| !predicate(c)) {
-            None => {
-                let len = state.input.len();
-
-                if len == 0 {
-                    // No failing index found because EOF
-                    ParseError::make_eof(state)
-                } else {
-                    // No failing index found because all of input matched
-                    let input = state.input;
-                    Ok((state.advance(len), input))
-                }
+            None => if state.input.len() == 0 {
+                // No failing index found because EOF
+                ParseError::make_eof(state)
+            } else {
+                // No failing index found because all of input matched
+                let input = state.input;
+                Ok((state.advance_to_end(), input))
             },
             // Input was non-empty and no matching index found
             Some(0) => ParseError::make_return(state, fail_msg.to_string()),

@@ -1,15 +1,15 @@
-type Name<'a> = &'a str;
+pub type Name<'a> = &'a str;
 
 #[derive(Debug, PartialEq)]
 pub struct Module<'a> {
-    name: Name<'a>,
-    definitions: Vec<Definition<'a>>,
+    pub name: Name<'a>,
+    pub definitions: Vec<Definition<'a>>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Definition<'a> {
-    name: Name<'a>,
-    value: Type<'a>,
+    pub name: Name<'a>,
+    pub value: Type<'a>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -20,17 +20,17 @@ pub enum Type<'a> {
 
 #[derive(Debug, PartialEq)]
 pub struct Constructor<'a> {
-    name: Name<'a>,
-    fields: Fields<'a>,
+    pub name: Name<'a>,
+    pub fields: Fields<'a>,
 }
 
-type Fields<'a> = Vec<Field<'a>>;
+pub type Fields<'a> = Vec<Field<'a>>;
 
 #[derive(Debug, PartialEq)]
 pub struct Field<'a> {
-    name: Name<'a>,
-    definition: Name<'a>,
-    count: Count,
+    pub name: Name<'a>,
+    pub definition: Name<'a>,
+    pub count: Count,
 }
 
 #[derive(Debug, PartialEq)]

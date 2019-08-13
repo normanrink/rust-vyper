@@ -61,7 +61,7 @@ impl<'a> State<'a> {
         state.advance(n)
     }
 
-    /// Advance the parsing cursor by `n` chars.
+    /// Advance parsing cursor by `n` chars.
     pub fn advance(&self, n: usize) -> Self {
         let mut line = self.line;
         let mut column = self.column;
@@ -84,6 +84,34 @@ impl<'a> State<'a> {
 
         Self {
             input: &self.input[off..],
+            position: self.position + local_position,
+            line,
+            column,
+            ..*self
+        }
+    }
+
+    /// Advance parsing cursor to end of file.
+    pub fn advance_to_end(&self) -> Self {
+        let mut line = self.line;
+        let mut column = self.column;
+
+        // Modify line and column number appropriately
+        let mut local_position = 0;
+        for chr in self.source.chars() {
+            if chr == '\n' {
+                line += 1;
+                column = 1;
+            } else if chr == '\r' {
+                // Don't modify line or column for carriage return
+            } else {
+                column += 1;
+            }
+            local_position += 1;
+        }
+
+        Self {
+            input: &self.input[self.input.len()..],
             position: self.position + local_position,
             line,
             column,
