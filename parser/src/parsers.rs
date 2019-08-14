@@ -1,72 +1,80 @@
-use crate::errors::{PResult, ParseError};
-use crate::traits::Input;
+use nom::bytes::complete::{tag, take_while1};
+use nom::character::complete::{char, line_ending, multispace0, space0, space1};
+use nom::multi::many0;
+use nom::sequence::terminated;
+use nom::IResult;
 
-/// Parse a specific item `expected`.  Fail for EOF.  Error for character mismatch.
-pub fn item<I>(expected: I::Item) -> impl Fn(I) -> PResult<I::Item, I>
-where
-    I: Input,
-{
-    move |input: I| {
-        let mut iter = input.iter_indices();
+use crate::ast::ModuleStmt::*;
+use crate::ast::*;
 
-        match iter.next() {
-            None => ParseError::eof(input),
-            Some((_, actual)) => {
-                if actual != expected {
-                    ParseError::error(input, format!("expected {:?}", expected))
-                } else {
-                    if let Some((i, _)) = iter.next() {
-                        Ok((actual, input.take_last(i)))
-                    } else {
-                        Ok((actual, input.take_last(input.input_len())))
-                    }
-                }
-            }
-        }
-    }
+pub fn is_symbol_start(c: char) -> bool {
+    c == '_' || c.is_ascii_alphabetic()
 }
 
-/// Parse `n` items.  Fail for EOF.  Error for too few items.
-pub fn take<I>(n: usize) -> impl Fn(I) -> PResult<I, I>
-where
-    I: Input,
-{
-    move |input: I| match input.slice_index(n) {
-        None => {
-            if input.input_len() == 0 {
-                ParseError::eof(input)
-            } else {
-                ParseError::error(input, format!("expected at least {} chars", n))
-            }
-        }
-        Some(i) => Ok(input.take_split(i)),
-    }
+pub fn is_symbol_char(c: char) -> bool {
+    c == '_' || c.is_ascii_alphabetic() || c.is_digit(10)
 }
 
-/// Parse leading items matched by `predicate`.  Fail for EOF.  Error for no matching items.
-pub fn take_while<P, I>(predicate: P, fail_msg: &'static str) -> impl Fn(I) -> PResult<I, I>
-where
-    P: Fn(I::Item) -> bool,
-    I: Input,
-{
-    move |input: I| {
-        match input.position(|c| !predicate(c)) {
-            None => {
-                let len = input.input_len();
-                if len == 0 {
-                    // No failing index found because EOF
-                    ParseError::eof(input)
-                } else {
-                    // No failing index found because all of input matched
-                    Ok((input.take_last(len), input))
-                }
-            }
-            // Input was non-empty and no matching index found
-            Some(0) => ParseError::error(input, fail_msg.to_string()),
-            // Input was non-empty and no matching index found
-            Some(i) => Ok(input.take_split(i)),
-        }
-    }
+pub fn symbol(i: &str) -> IResult<&str, &str> {
+    take_while1(is_symbol_start)(i)?;
+    take_while1(is_symbol_char)(i)
+}
+
+pub fn symbol_token(i: &str) -> IResult<&str, &str> {
+    terminated(symbol, space0)(i)
+}
+
+pub fn char_token(c: char) -> impl Fn(&str) -> IResult<&str, char> {
+    move |i: &str| terminated(char(c), space0)(i)
+}
+
+pub fn tag_token(t: &'static str) -> impl Fn(&str) -> IResult<&str, &str> {
+    move |i: &str| terminated(tag(t), space0)(i)
+}
+
+pub fn parse_module(i: &str) -> IResult<&str, Module> {
+    let (i, _) = multispace0(i)?;
+    let (i, body) = many0(parse_module_stmt)(i)?;
+
+    Ok((i, Module { body }))
+}
+
+pub fn parse_module_stmt(i: &str) -> IResult<&str, ModuleStmt> {
+    let (i, event_def) = parse_event_def(i)?;
+
+    Ok((i, event_def))
+}
+
+pub fn parse_event_def(i: &str) -> IResult<&str, ModuleStmt> {
+    let (i, _) = terminated(tag("event"), space1)(i)?;
+    let (i, name) = terminated(symbol, space0)(i)?;
+    let (i, _) = terminated(char(':'), space0)(i)?;
+    let (i, _) = line_ending(i)?;
+
+    let (i, _) = tag("    ")(i)?;
+    let (i, field) = parse_event_field(i)?;
+
+    Ok((
+        i,
+        EventDef {
+            name: name.to_string(),
+            fields: vec![field],
+        },
+    ))
+}
+
+pub fn parse_event_field(i: &str) -> IResult<&str, EventField> {
+    let (i, name) = terminated(symbol, space0)(i)?;
+    let (i, _) = terminated(char(':'), space0)(i)?;
+    let (i, typ) = terminated(symbol, space0)(i)?;
+
+    Ok((
+        i,
+        EventField {
+            name: name.to_string(),
+            typ: typ.to_string(),
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -74,62 +82,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_char() {
-        // Success
-        assert_eq!(item('c')("c"), Ok(('c', "")));
-
-        // Char not found
+    fn test_module() {
         assert_eq!(
-            item('c')("d"),
-            ParseError::error("d", "expected 'c'".to_string()),
+            parse_module(
+                r###"
+event Greet:
+    name: bytes32"###
+            ),
+            Ok((
+                "",
+                Module {
+                    body: vec![EventDef {
+                        name: "Greet".to_string(),
+                        fields: vec![EventField {
+                            name: "name".to_string(),
+                            typ: "bytes32".to_string(),
+                        },],
+                    }]
+                }
+            )),
         );
-
-        // EOF
-        assert_eq!(item('c')(""), ParseError::eof(""),);
-    }
-
-    #[test]
-    fn test_take() {
-        // Success
-        assert_eq!(take(4)("asdf"), Ok(("asdf", "")));
-        assert_eq!(take(4)("asdfzxcv"), Ok(("asdf", "zxcv")));
-
-        // Not enough input
-        assert_eq!(
-            take(4)("c"),
-            ParseError::error("c", "expected at least 4 chars".to_string()),
-        );
-
-        // EOF
-        assert_eq!(take(4)(""), ParseError::eof(""));
-    }
-
-    #[test]
-    fn test_take_while() {
-        // Success
-        let take_while_alphabetic = take_while(
-            |c: char| c.is_ascii_alphabetic(),
-            "expected alphabetic chars",
-        );
-
-        assert_eq!(
-            take_while_alphabetic("asdfASDF1234"),
-            Ok(("asdfASDF", "1234"))
-        );
-
-        // Expected chars
-        assert_eq!(
-            take_while_alphabetic("1234"),
-            ParseError::error("1234", "expected alphabetic chars".to_string()),
-        );
-
-        // EOF
-        assert_eq!(take_while_alphabetic(""), ParseError::eof(""));
-    }
-
-    #[test]
-    fn scratch() {
-        let s = &"asdf".to_string();
-        //println!("{:?}", s.());
     }
 }
