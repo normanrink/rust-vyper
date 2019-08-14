@@ -1,68 +1,72 @@
-use crate::internals::{
-    IResult,
-    State,
-    ParseError,
-};
-use crate::utils::{
-    char_offset,
-    len_chars,
-};
+use crate::internal::{PResult, ParseError};
+use crate::traits::Input;
 
-/// Parse a specific char `expected`.  Exit for EOF.  Return for character mismatch.
-pub fn char<'a>(expected: char) -> impl Fn(State<'a>) -> IResult<State<'a>, char> {
-    move |state: State| {
-        match state.input.chars().next() {
-            None => ParseError::make_eof(state),
-            Some(actual) => if actual != expected {
-                ParseError::make_return(state, format!("expected {:?}", expected))
-            } else {
-                Ok((state.advance(1), expected))
-            },
+/// Parse a specific item `expected`.  Fail for EOF.  Error for character mismatch.
+pub fn item<I>(expected: I::Item) -> impl Fn(I) -> PResult<I, I::Item>
+where
+    I: Input,
+{
+    move |input: I| {
+        let mut iter = input.iter_indices();
+
+        match iter.next() {
+            None => ParseError::eof(input),
+            Some((_, actual)) => {
+                if actual != expected {
+                    ParseError::error(input, format!("expected {:?}", expected))
+                } else {
+                    if let Some((i, _)) = iter.next() {
+                        Ok((input.take_last(i), actual))
+                    } else {
+                        Ok((input.take_last(input.input_len()), actual))
+                    }
+                }
+            }
         }
     }
 }
 
-/// Parse `n` characters.  Exit for EOF.  Return for too few chars.
-pub fn take<'a>(n: usize) -> impl Fn(State<'a>) -> IResult<State<'a>, &'a str> {
-    move |state: State| {
-        match char_offset(state.input, n) {
-            None => if state.input.len() == 0 {
-                ParseError::make_eof(state)
+/// Parse `n` items.  Fail for EOF.  Error for too few items.
+pub fn take<I>(n: usize) -> impl Fn(I) -> PResult<I, I>
+where
+    I: Input,
+{
+    move |input: I| match input.slice_index(n) {
+        None => {
+            if input.input_len() == 0 {
+                ParseError::eof(input)
             } else {
-                ParseError::make_return(state, format!("expected at least {} chars", n))
-            },
-            Some(off) => Ok((state.advance(n), &state.input[..off])),
+                ParseError::error(input, format!("expected at least {} chars", n))
+            }
         }
+        Some(i) => Ok(input.take_split(i)),
     }
 }
 
 /// Parse leading characters matched by `predicate`.  Exit for EOF.  Return for no matching chars.
-pub fn take_while<'a, P>(predicate: P, fail_msg: &'static str)-> impl Fn(State<'a>) -> IResult<State<'a>, &'a str>
-where P: Fn(char) -> bool
+pub fn take_while<P, I>(predicate: P, fail_msg: &'static str) -> impl Fn(I) -> PResult<I, I>
+where
+    P: Fn(I::Item) -> bool,
+    I: Input,
 {
-    move |state: State| {
-        match state.input.find(|c| !predicate(c)) {
-            None => if state.input.len() == 0 {
-                // No failing index found because EOF
-                ParseError::make_eof(state)
-            } else {
-                // No failing index found because all of input matched
-                let input = state.input;
-                Ok((state.advance_to_end(), input))
-            },
+    move |input: I| {
+        match input.position(|c| !predicate(c)) {
+            None => {
+                let len = input.input_len();
+                if len == 0 {
+                    // No failing index found because EOF
+                    ParseError::eof(input)
+                } else {
+                    // No failing index found because all of input matched
+                    Ok((input.take_last(len), input))
+                }
+            }
             // Input was non-empty and no matching index found
-            Some(0) => ParseError::make_return(state, fail_msg.to_string()),
+            Some(0) => ParseError::error(input, fail_msg.to_string()),
             // Input was non-empty and no matching index found
-            Some(i) => Ok((state.advance(i), &state.input[..i])),
+            Some(i) => Ok(input.take_split(i)),
         }
     }
-}
-
-/// Execute a parsing operation with `parser` and an initial state created from `source`.
-pub fn do_parse<'a, P, O>(parser: P, source: &'a str) -> IResult<State<'a>, O>
-where P: Fn(State<'a>) -> IResult<State<'a>, O>
-{
-    parser(State::from_str(source))
 }
 
 #[cfg(test)]
@@ -72,85 +76,67 @@ mod tests {
     #[test]
     fn test_char() {
         // Success
-        assert_eq!(
-            do_parse(char('c'), "c"),
-            Ok((State::from_str_n("c", 1), 'c')),
-        );
+        assert_eq!(item('c')("c"), Ok(("", 'c')));
 
         // Char not found
         assert_eq!(
-            do_parse(char('c'), "d"),
-            ParseError::make_return(State::from_str("d"), "expected 'c'".to_string()),
+            item('c')("d"),
+            ParseError::error("d", "expected 'c'".to_string()),
         );
 
         // EOF
-        assert_eq!(
-            do_parse(char('c'), ""),
-            ParseError::make_exit(State::from_str(""), "EOF".to_string()),
-        );
+        assert_eq!(item('c')(""), ParseError::eof(""),);
     }
 
     #[test]
     fn test_take() {
         // Success
-        assert_eq!(
-            do_parse(take(4), "asdf"),
-            Ok((State::from_str_n("asdf", 4), "asdf"))
-        );
-        assert_eq!(
-            do_parse(take(4), "asdfzxcv"),
-            Ok((State::from_str_n("asdfzxcv", 4), "asdf"))
-        );
+        assert_eq!(take(4)("asdf"), Ok(("", "asdf")));
+        assert_eq!(take(4)("asdfzxcv"), Ok(("zxcv", "asdf")));
 
         // Not enough input
         assert_eq!(
-            do_parse(take(4), "c"),
-            ParseError::make_return(State::from_str("c"), "expected at least 4 chars".to_string()),
+            take(4)("c"),
+            ParseError::error("c", "expected at least 4 chars".to_string()),
         );
 
         // EOF
-        assert_eq!(
-            do_parse(take(4), ""),
-            ParseError::make_eof(State::from_str("")),
-        );
+        assert_eq!(take(4)(""), ParseError::eof(""));
     }
 
     #[test]
     fn test_take_while() {
         // Success
         let take_while_alphabetic = take_while(
-            |c| c.is_ascii_alphabetic(),
+            |c: char| c.is_ascii_alphabetic(),
             "expected alphabetic chars",
         );
         assert_eq!(
-            do_parse(take_while_alphabetic, "asdfASDF1234"),
-            Ok((State::from_str_n("asdfASDF1234", 8), "asdfASDF"))
+            take_while_alphabetic("asdfASDF1234"),
+            Ok(("1234", "asdfASDF"))
         );
 
         // Expected chars
         let take_while_alphabetic = take_while(
-            |c| c.is_ascii_alphabetic(),
+            |c: char| c.is_ascii_alphabetic(),
             "expected alphabetic chars",
         );
         assert_eq!(
-            do_parse(take_while_alphabetic, "1234"),
-            ParseError::make_return(State::from_str("1234"), "expected alphabetic chars".to_string()),
+            take_while_alphabetic("1234"),
+            ParseError::error("1234", "expected alphabetic chars".to_string()),
         );
 
         // EOF
         let take_while_alphabetic = take_while(
-            |c| c.is_ascii_alphabetic(),
+            |c: char| c.is_ascii_alphabetic(),
             "expected alphabetic chars",
         );
-        assert_eq!(
-            do_parse(take_while_alphabetic, ""),
-            ParseError::make_eof(State::from_str("")),
-        );
+        assert_eq!(take_while_alphabetic(""), ParseError::eof(""));
     }
 
     #[test]
     fn scratch() {
         let s = &"asdf".to_string();
-        println!("{:?}", s.find(|c: char| !c.is_ascii_alphabetic()));
+        //println!("{:?}", s.());
     }
 }

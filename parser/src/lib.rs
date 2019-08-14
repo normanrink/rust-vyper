@@ -1,5 +1,5 @@
 pub mod asdl;
-pub mod internals;
+pub mod internal;
 pub mod parsers;
-pub mod utils;
+pub mod traits;
 pub mod vyper;
