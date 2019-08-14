@@ -1,8 +1,8 @@
-use crate::internal::{PResult, ParseError};
+use crate::errors::{PResult, ParseError};
 use crate::traits::Input;
 
 /// Parse a specific item `expected`.  Fail for EOF.  Error for character mismatch.
-pub fn item<I>(expected: I::Item) -> impl Fn(I) -> PResult<I, I::Item>
+pub fn item<I>(expected: I::Item) -> impl Fn(I) -> PResult<I::Item, I>
 where
     I: Input,
 {
@@ -16,9 +16,9 @@ where
                     ParseError::error(input, format!("expected {:?}", expected))
                 } else {
                     if let Some((i, _)) = iter.next() {
-                        Ok((input.take_last(i), actual))
+                        Ok((actual, input.take_last(i)))
                     } else {
-                        Ok((input.take_last(input.input_len()), actual))
+                        Ok((actual, input.take_last(input.input_len())))
                     }
                 }
             }
@@ -43,7 +43,7 @@ where
     }
 }
 
-/// Parse leading characters matched by `predicate`.  Exit for EOF.  Return for no matching chars.
+/// Parse leading items matched by `predicate`.  Fail for EOF.  Error for no matching items.
 pub fn take_while<P, I>(predicate: P, fail_msg: &'static str) -> impl Fn(I) -> PResult<I, I>
 where
     P: Fn(I::Item) -> bool,
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn test_char() {
         // Success
-        assert_eq!(item('c')("c"), Ok(("", 'c')));
+        assert_eq!(item('c')("c"), Ok(('c', "")));
 
         // Char not found
         assert_eq!(
@@ -91,8 +91,8 @@ mod tests {
     #[test]
     fn test_take() {
         // Success
-        assert_eq!(take(4)("asdf"), Ok(("", "asdf")));
-        assert_eq!(take(4)("asdfzxcv"), Ok(("zxcv", "asdf")));
+        assert_eq!(take(4)("asdf"), Ok(("asdf", "")));
+        assert_eq!(take(4)("asdfzxcv"), Ok(("asdf", "zxcv")));
 
         // Not enough input
         assert_eq!(
@@ -111,26 +111,19 @@ mod tests {
             |c: char| c.is_ascii_alphabetic(),
             "expected alphabetic chars",
         );
+
         assert_eq!(
             take_while_alphabetic("asdfASDF1234"),
-            Ok(("1234", "asdfASDF"))
+            Ok(("asdfASDF", "1234"))
         );
 
         // Expected chars
-        let take_while_alphabetic = take_while(
-            |c: char| c.is_ascii_alphabetic(),
-            "expected alphabetic chars",
-        );
         assert_eq!(
             take_while_alphabetic("1234"),
             ParseError::error("1234", "expected alphabetic chars".to_string()),
         );
 
         // EOF
-        let take_while_alphabetic = take_while(
-            |c: char| c.is_ascii_alphabetic(),
-            "expected alphabetic chars",
-        );
         assert_eq!(take_while_alphabetic(""), ParseError::eof(""));
     }
 

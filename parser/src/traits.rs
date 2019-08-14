@@ -31,7 +31,7 @@ pub trait Input: Sized {
     /// Split an object at unstructured index `i` into a result-like tuple (remaining items first,
     /// output last).  Panics if i > length.
     fn take_split(&self, i: usize) -> (Self, Self) {
-        (self.take_last(i), self.take_first(i))
+        (self.take_first(i), self.take_last(i))
     }
 
     /// Return the unstructured length of an object.
