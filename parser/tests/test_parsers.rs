@@ -172,7 +172,7 @@ fn test_const_expr_success() {
 fn test_file_input_empty_file() {
     // Empty file
     assert_parser_success!(
-        file_input::<SimpleError<_>>,
+        file_input::<Spanned<_>, SimpleError<_>>,
         vec![
             (
                 "",
@@ -211,7 +211,7 @@ fn test_file_input_empty_file() {
 #[test]
 fn test_file_input_one_stmt() {
     assert_fixtures_parsed!(
-        file_input::<VerboseError<_>>,
+        file_input::<Spanned<Module>, VerboseError<_>>,
         "fixtures/parsers/file_input/one_stmt_no_whitespace.ron",
         "fixtures/parsers/file_input/one_stmt_leading_whitespace.ron",
         "fixtures/parsers/file_input/one_stmt_leading_trailing.ron",
@@ -221,7 +221,7 @@ fn test_file_input_one_stmt() {
 #[test]
 fn test_file_input_many_stmt() {
     assert_fixtures_parsed!(
-        file_input::<VerboseError<_>>,
+        file_input::<Spanned<Module>, VerboseError<_>>,
         "fixtures/parsers/file_input/many_stmt_no_whitespace.ron",
         "fixtures/parsers/file_input/many_stmt_leading_whitespace.ron",
         "fixtures/parsers/file_input/many_stmt_leading_trailing.ron",

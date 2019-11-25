@@ -25,7 +25,10 @@ use nom::IResult;
 use crate::ast::ModuleStmt::*;
 use crate::ast::*;
 use crate::errors::make_error;
-use crate::span::Spanned;
+use crate::span::{
+    Span,
+    Spanned,
+};
 use crate::tokenizer::tokenize::tokenize;
 use crate::tokenizer::types::{
     Token,
@@ -146,8 +149,9 @@ where
 }
 
 /// Parse a module definition.
-pub fn file_input<'a, E>(input: TokenSlice<'a>) -> TokenResult<Spanned<Module>, E>
+pub fn file_input<'a, O, E>(input: TokenSlice<'a>) -> TokenResult<O, E>
 where
+    O: From<(Module<'a>, Span)>,
     E: ParseError<TokenSlice<'a>>,
 {
     // (NEWLINE* module_stmt)*
@@ -169,13 +173,7 @@ where
         None => end_tok.span,
     };
 
-    Ok((
-        input,
-        Spanned {
-            node: Module { body },
-            span: span,
-        },
-    ))
+    Ok((input, (Module { body }, span).into()))
 }
 
 /// Parse a module statement, such as a contract definition.

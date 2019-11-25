@@ -5,14 +5,44 @@ use serde::{
     Serialize,
 };
 
-use crate::span::Spanned;
+use crate::span::{
+    Span,
+    Spanned,
+};
 use crate::tokenizer::types::Token;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Module<'a> {
-    #[serde(borrow)]
-    pub body: Vec<Spanned<ModuleStmt<'a>>>,
+macro_rules! from_spanned_impl {
+    ($input:ty) => {
+        impl<'a> From<($input, Span)> for Spanned<$input> {
+            fn from(info: ($input, Span)) -> Self {
+                let (node, span) = info;
+                Spanned { node, span }
+            }
+        }
+    };
 }
+
+macro_rules! from_unspanned_impl {
+    ($input:ty) => {
+        impl<'a> From<($input, Span)> for $input {
+            fn from(info: ($input, Span)) -> Self {
+                let (node, _) = info;
+                node
+            }
+        }
+    };
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Module<'a, O>
+where
+    O: From<(ModuleStmt<'a>, Span)>,
+{
+    pub body: Vec<O>,
+}
+
+from_spanned_impl!(Module<'a, Spanned<ModuleStmt<'a>>>);
+from_unspanned_impl!(Module<'a, ModuleStmt<'a>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum ModuleStmt<'a> {
@@ -21,6 +51,9 @@ pub enum ModuleStmt<'a> {
         fields: Vec<Spanned<EventField<'a>>>,
     },
 }
+
+from_spanned_impl!(ModuleStmt<'a>);
+from_unspanned_impl!(ModuleStmt<'a>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct TypeDesc<'a> {
